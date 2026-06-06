@@ -1,0 +1,1310 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Adaptive Noise Reduction Lab</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%230a0c0f'/%3E%3Cpath d='M14 40V24m8 22V18m8 20V26m8 24V14m8 26V22m8 18V20' stroke='%2338d9ff' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@500;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0c0f;
+      --bg-soft: #10141a;
+      --panel: #11151c;
+      --panel-2: #0f1319;
+      --text: #e7edf5;
+      --muted: #8f9bad;
+      --border: #1f2630;
+      --danger: #ff4f4f;
+      --webrtc: #44d97e;
+      --sqa: #38d9ff;
+      --rnn: #a56bff;
+      --hybridrs: #ffbf4d;
+      --hybridrw: #ff8f3f;
+      --rsadapv: #e74c3c;
+      --rspv: #9b59b6;
+      --rwadapv: #f1c40f;
+      --rwpv: #e67e22;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      --space-1: 0.5rem;
+      --space-2: 0.75rem;
+      --space-3: 1rem;
+      --space-4: 1.25rem;
+      --space-5: 1.5rem;
+      --space-6: 2rem;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      margin: 0;
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Space Mono", monospace;
+    }
+
+    body {
+      position: relative;
+      overflow-x: hidden;
+      background:
+        radial-gradient(circle at 12% -8%, rgba(56, 217, 255, 0.16), transparent 35%),
+        radial-gradient(circle at 85% -15%, rgba(165, 107, 255, 0.18), transparent 34%),
+        radial-gradient(circle at 50% -25%, rgba(255, 143, 63, 0.15), transparent 34%),
+        var(--bg);
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.1;
+      background-image:
+        radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.18) 0.6px, transparent 0.7px),
+        radial-gradient(circle at 80% 40%, rgba(255, 255, 255, 0.15) 0.6px, transparent 0.7px),
+        radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.12) 0.8px, transparent 0.9px);
+      background-size: 180px 180px, 220px 220px, 260px 260px;
+      z-index: -1;
+    }
+
+    .container {
+      width: min(1400px, 95vw);
+      margin: 0 auto;
+      padding-bottom: var(--space-6);
+    }
+
+    header.hero {
+      margin-top: var(--space-6);
+      border: 1px solid var(--border);
+      border-radius: calc(var(--radius) + 6px);
+      background: linear-gradient(145deg, rgba(17, 21, 28, 0.94), rgba(10, 12, 15, 0.96));
+      padding: clamp(1rem, 2vw, 2rem);
+      box-shadow: var(--shadow);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-top {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      flex-wrap: wrap;
+      justify-content: space-between;
+    }
+
+    .title-wrap h1 {
+      font-family: "Syne", sans-serif;
+      font-size: clamp(1.65rem, 3.4vw, 3rem);
+      margin: 0;
+      line-height: 1.05;
+      letter-spacing: 0.01em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-top: var(--space-2);
+      font-size: 0.92rem;
+      max-width: 72ch;
+    }
+
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      border: 1px solid rgba(255, 79, 79, 0.5);
+      color: #ff9b9b;
+      padding: 0.45rem 0.7rem;
+      border-radius: 999px;
+      background: rgba(255, 79, 79, 0.1);
+    }
+
+    .live-dot {
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background: var(--danger);
+      box-shadow: 0 0 0 0 rgba(255, 79, 79, 0.7);
+      animation: pulse 1.6s infinite;
+    }
+
+    .stats {
+      margin-top: var(--space-5);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(120px, 1fr));
+      gap: var(--space-3);
+    }
+
+    .stat {
+      border: 1px solid var(--border);
+      background: rgba(17, 21, 28, 0.65);
+      border-radius: var(--radius-sm);
+      padding: 0.8rem 1rem;
+    }
+
+    .stat-value {
+      font-family: "Syne", sans-serif;
+      font-size: clamp(1.4rem, 2.3vw, 2rem);
+      line-height: 1;
+      margin-bottom: 0.3rem;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .hero-wave {
+      margin-top: var(--space-5);
+      display: flex;
+      align-items: end;
+      gap: 6px;
+      height: 64px;
+    }
+
+    .hero-wave span {
+      width: min(1.7vw, 12px);
+      border-radius: 999px;
+      background: linear-gradient(to top, rgba(56, 217, 255, 0.25), rgba(68, 217, 126, 0.95));
+      animation: equalize 1.1s infinite ease-in-out alternate;
+      transform-origin: bottom;
+      min-width: 4px;
+      max-width: 10px;
+    }
+
+    .hero-wave span:nth-child(3n) {
+      background: linear-gradient(to top, rgba(165, 107, 255, 0.2), rgba(165, 107, 255, 0.95));
+    }
+
+    .hero-wave span:nth-child(4n) {
+      background: linear-gradient(to top, rgba(255, 191, 77, 0.2), rgba(255, 143, 63, 0.95));
+    }
+
+    .legend-bar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      margin-top: var(--space-4);
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+      align-items: center;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: rgba(10, 12, 15, 0.88);
+      backdrop-filter: blur(8px);
+      padding: 0.75rem;
+    }
+
+    .pill {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 0.42rem 0.75rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: transform 0.25s ease, opacity 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .pill:hover {
+      transform: translateY(-1px);
+    }
+
+    .pill[data-active="false"] {
+      opacity: 0.45;
+      filter: saturate(0.4);
+    }
+
+    .pill[data-key="WebRTC"] { border-color: color-mix(in srgb, var(--webrtc) 45%, var(--border)); }
+    .pill[data-key="sqa"] { border-color: color-mix(in srgb, var(--sqa) 45%, var(--border)); }
+    .pill[data-key="RNN"] { border-color: color-mix(in srgb, var(--rnn) 45%, var(--border)); }
+    .pill[data-key="HybridRS"] { border-color: color-mix(in srgb, var(--hybridrs) 45%, var(--border)); }
+    .pill[data-key="HybridRW"] { border-color: color-mix(in srgb, var(--hybridrw) 45%, var(--border)); }
+    .pill[data-key="RSADAPV"] { border-color: color-mix(in srgb, var(--rsadapv) 45%, var(--border)); }
+    .pill[data-key="RSPV"] { border-color: color-mix(in srgb, var(--rspv) 45%, var(--border)); }
+    .pill[data-key="RWADAPV"] { border-color: color-mix(in srgb, var(--rwadapv) 45%, var(--border)); }
+    .pill[data-key="RWPV"] { border-color: color-mix(in srgb, var(--rwpv) 45%, var(--border)); }
+
+    .pill-reset {
+      margin-left: auto;
+      background: transparent;
+      border-color: #465060;
+    }
+
+    .main-layout {
+      margin-top: var(--space-4);
+      display: grid;
+      grid-template-columns: 280px 1fr;
+      gap: var(--space-4);
+      align-items: start;
+    }
+
+    .sidebar {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(17, 21, 28, 0.95), rgba(12, 15, 20, 0.94));
+      padding: 0.6rem;
+      box-shadow: var(--shadow);
+    }
+
+    .sample-item {
+      width: 100%;
+      text-align: left;
+      border: 1px solid transparent;
+      background: transparent;
+      color: var(--text);
+      border-radius: var(--radius-sm);
+      padding: 0.7rem 0.8rem;
+      margin: 0;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.25s ease, transform 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .sample-item + .sample-item {
+      margin-top: 0.35rem;
+    }
+
+    .sample-item:hover {
+      transform: translateX(3px);
+      border-color: #2a3543;
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .sample-item.active {
+      border-color: #314256;
+      background: rgba(56, 217, 255, 0.08);
+    }
+
+    .sample-title {
+      font-size: 0.85rem;
+    }
+
+    .sample-meta {
+      display: block;
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 0.12rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .active-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      border: 1px solid #2c3644;
+      background: #29303b;
+      transition: all 0.25s ease;
+      flex: 0 0 9px;
+    }
+
+    .sample-item.active .active-dot {
+      background: var(--sqa);
+      border-color: color-mix(in srgb, var(--sqa) 65%, #ffffff 12%);
+      box-shadow: 0 0 0 5px rgba(56, 217, 255, 0.1);
+    }
+
+    .detail-panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(16, 20, 26, 0.95), rgba(11, 14, 18, 0.95));
+      padding: var(--space-4);
+      min-height: 400px;
+      box-shadow: var(--shadow);
+    }
+
+    .detail-title {
+      margin: 0;
+      font-family: "Syne", sans-serif;
+      font-size: clamp(1.4rem, 2.4vw, 2.25rem);
+      letter-spacing: 0.01em;
+    }
+
+    .detail-sub {
+      margin-top: 0.45rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    .detail-wave {
+      margin-top: var(--space-4);
+      height: 90px;
+      border: 1px solid #222b36;
+      border-radius: var(--radius-sm);
+      background: linear-gradient(180deg, rgba(15, 19, 26, 0.92), rgba(11, 14, 18, 0.88));
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      gap: 5px;
+      padding: 0 10px;
+    }
+
+    .wave-bar {
+      width: 8px;
+      border-radius: 999px;
+      background: linear-gradient(to top, rgba(255, 255, 255, 0.08), rgba(56, 217, 255, 0.9));
+      height: 20%;
+      animation: idleWave 1.6s infinite ease-in-out alternate;
+      animation-play-state: paused;
+      transform-origin: bottom;
+    }
+
+    .detail-wave.playing .wave-bar {
+      animation-play-state: running;
+    }
+
+    .cards-grid {
+      margin-top: var(--space-4);
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--space-3);
+    }
+
+    .audio-card {
+      border: 1px solid #252d3a;
+      border-top-width: 3px;
+      border-radius: var(--radius-sm);
+      background: var(--panel-2);
+      padding: 0.95rem;
+      transition: transform 0.25s ease, box-shadow 0.25s ease, opacity 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .audio-card.hidden {
+      opacity: 0.08;
+      pointer-events: none;
+      transform: scale(0.985);
+    }
+
+    .audio-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.4);
+    }
+
+    .card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.6rem;
+      align-items: center;
+      margin-bottom: 0.8rem;
+    }
+
+    .algo-label {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+
+    .tag {
+      font-size: 0.62rem;
+      border: 1px solid #334155;
+      border-radius: 999px;
+      padding: 0.17rem 0.48rem;
+      color: #c9d3df;
+      letter-spacing: 0.07em;
+    }
+
+    .player {
+      border: 1px solid #2a3340;
+      border-radius: 10px;
+      padding: 0.65rem;
+      background: rgba(255, 255, 255, 0.015);
+    }
+
+    .player-row {
+      display: flex;
+      align-items: center;
+      gap: 0.55rem;
+    }
+
+    .play-btn {
+      border: 1px solid #415062;
+      background: #151a22;
+      color: var(--text);
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      transition: transform 0.2s ease;
+      flex: 0 0 34px;
+    }
+
+    .play-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .seek {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 999px;
+      background: #2a3341;
+      outline: none;
+    }
+
+    .seek::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      border: 0;
+      background: currentColor;
+      cursor: pointer;
+    }
+
+    .seek::-moz-range-thumb {
+      width: 12px;
+      height: 12px;
+      border: 0;
+      border-radius: 50%;
+      background: currentColor;
+      cursor: pointer;
+    }
+
+    .time {
+      margin-top: 0.35rem;
+      color: var(--muted);
+      font-size: 0.7rem;
+      display: flex;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .native-audio {
+      margin-top: 0.55rem;
+      width: 100%;
+      opacity: 0.7;
+      filter: grayscale(0.15) contrast(0.95);
+    }
+
+    .missing {
+      margin-top: 0.45rem;
+      font-size: 0.7rem;
+      color: #e0b7b7;
+      opacity: 0.9;
+    }
+
+    footer {
+      margin-top: var(--space-6);
+      border-top: 1px solid var(--border);
+      padding-top: var(--space-4);
+      color: var(--muted);
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.8rem;
+      font-size: 0.78rem;
+    }
+
+    @keyframes equalize {
+      from { height: 15%; }
+      to { height: 95%; }
+    }
+
+    @keyframes idleWave {
+      from { height: 15%; opacity: 0.35; }
+      to { height: 92%; opacity: 1; }
+    }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(255, 79, 79, 0.65); }
+      100% { box-shadow: 0 0 0 12px rgba(255, 79, 79, 0); }
+    }
+
+    @media (max-width: 980px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        max-height: none;
+        overflow: auto hidden;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(180px, 1fr);
+        align-items: stretch;
+        gap: 0.45rem;
+      }
+
+      .sample-item {
+        min-height: 72px;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .legend-bar {
+        top: 6px;
+      }
+
+      .pill-reset {
+        margin-left: 0;
+      }
+
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .detail-panel {
+        padding: 0.95rem;
+      }
+    }
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85);
+      backdrop-filter: blur(8px);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.hidden {
+      display: none;
+    }
+    .modal-content {
+      background: var(--panel);
+      padding: 2.5rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+    .modal-content h3 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      font-family: "Syne", sans-serif;
+    }
+    .modal-content p {
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .cdsid-input {
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid #334155;
+      color: var(--text);
+      font-family: "Space Mono", monospace;
+      font-size: 1.1rem;
+      padding: 0.8rem 1rem;
+      border-radius: var(--radius-sm);
+      outline: none;
+      transition: border-color 0.2s ease;
+      width: 100%;
+      text-transform: uppercase;
+      text-align: center;
+      margin-bottom: 1.5rem;
+      box-sizing: border-box;
+    }
+    .cdsid-input:focus {
+      border-color: var(--sqa);
+    }
+    .submit-actions {
+      margin-top: 2rem;
+      display: flex;
+      justify-content: flex-end;
+      border-top: 1px solid var(--border);
+      padding-top: 1.5rem;
+    }
+    .submit-btn {
+      background: var(--hybridrw);
+      color: #000;
+      font-family: "Syne", sans-serif;
+      font-weight: 700;
+      font-size: 0.95rem;
+      padding: 0.8rem 1.5rem;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: opacity 0.2s ease, transform 0.1s ease;
+    }
+    .submit-btn:hover {
+      opacity: 0.9;
+    }
+    .submit-btn:active {
+      transform: scale(0.98);
+    }
+    .plots-grid {
+      margin-top: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-5);
+    }
+    .plot-card {
+      margin: 0;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--panel-2);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: var(--space-3);
+    }
+    .plot-card img {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      background: #fff;
+      border-radius: 4px;
+    }
+    .plot-card figcaption {
+      margin-top: var(--space-3);
+      width: 100%;
+      padding-top: var(--space-2);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      text-align: center;
+      color: var(--text);
+      border-top: 1px dashed var(--border);
+    }
+
+    .rating-input {
+      width: 60px;
+      background: rgba(0, 0, 0, 0.2);
+      border: 1px solid #334155;
+      color: var(--text);
+      font-family: "Space Mono", monospace;
+      font-size: 0.85rem;
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      text-align: center;
+      outline: none;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    .rating-input:focus {
+      border-color: var(--sqa);
+      box-shadow: 0 0 0 2px rgba(56, 217, 255, 0.15);
+    }
+    .rating-wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.6rem;
+      padding-top: 0.6rem;
+      border-top: 1px dashed #2a3340;
+    }
+    .rating-label {
+      font-size: 0.7rem;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+  </style>
+</head>
+<body>
+  <div id="cdsid-modal-overlay" class="modal-overlay">
+    <div class="modal-content">
+      <h3>Welcome to the Evaluation</h3>
+      <p>Please enter your CDSID to begin rating the audio samples.</p>
+      <input type="text" id="modal-cdsid-input" class="cdsid-input" placeholder="Enter CDSID" />
+      <button id="modal-cdsid-submit" class="submit-btn" style="width: 100%;">Start Rating</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <header class="hero">
+      <div class="hero-top">
+        <div class="title-wrap">
+          <h1>Audio Noise Reduction Research Lab</h1>
+          <div class="subtitle">
+            Comparative evaluation of noisy speech enhancement pipelines across classical suppression and neural hybrid denoising methods.
+          </div>
+        </div>
+        <div class="live-badge"><span class="live-dot"></span> Live Analysis</div>
+      </div>
+
+      <div class="stats">
+        <div class="stat">
+          <div class="stat-value" id="stat-files">19</div>
+          <div class="stat-label">Files</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="stat-algos">5</div>
+          <div class="stat-label">Algorithms</div>
+        </div>
+        <div class="stat">
+          <div class="stat-value" id="stat-outputs">95</div>
+          <div class="stat-label">Outputs</div>
+        </div>
+      </div>
+
+      <div class="hero-wave" id="hero-wave" aria-hidden="true"></div>
+    </header>
+
+    <section class="legend-bar" id="legend"></section>
+
+    <main class="main-layout">
+      <aside class="sidebar" id="sample-list" aria-label="Sample list"></aside>
+      <section class="detail-panel" id="detail-panel"></section>
+    </main>
+
+    <footer>
+      <span>Adaptive Noise Reduction Research Project</span>
+
+      <span id="year"></span>
+    </footer>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+    import { getFirestore, collection, doc, setDoc, getDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDelpix5jlxN1sAnndvued-BqDyVEVlBa0",
+      authDomain: "web-app-9c0b3.firebaseapp.com",
+      projectId: "web-app-9c0b3",
+      storageBucket: "web-app-9c0b3.firebasestorage.app",
+      messagingSenderId: "923051189730",
+      appId: "1:923051189730:web:159dbc84e8597a230d85bb",
+      measurementId: "G-ZVX26HDKTR"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const algorithms = [
+      { key: "WebRTC", label: "WebRTC", shortLabel: "WebRTC", color: "var(--webrtc)", tag: "PROCESSED", csvKey: "WebRTC" },
+      { key: "sqa", label: "SQA", shortLabel: "SQA", color: "var(--sqa)", tag: "PROCESSED", csvKey: "sqa" },
+      { key: "RNN", label: "RNN", shortLabel: "RNN", color: "var(--rnn)", tag: "PROCESSED", csvKey: "RNN" },
+      { key: "HybridRW", label: "HybridRW (RNN + WebRTC)", shortLabel: "HybridRW", color: "var(--hybridrw)", tag: "PROCESSED", csvKey: "RW" },
+      { key: "HybridRS", label: "HybridRS (RNN + SQA)", shortLabel: "HybridRS", color: "var(--hybridrs)", tag: "PROCESSED", csvKey: "RS" },
+      { key: "RWPV", label: "RWPV (HybridRW + PhaseVocoder)", shortLabel: "RWPV", color: "var(--rwpv)", tag: "PROCESSED", csvKey: "RWPV" },
+      { key: "RSPV", label: "RSPV (HybridRS + PhaseVocoder)", shortLabel: "RSPV", color: "var(--rspv)", tag: "PROCESSED", csvKey: "RSPV" },
+      { key: "RWADAPV", label: "RWADAPV (RWPV + Adaptive)", shortLabel: "RWADAPV", color: "var(--rwadapv)", tag: "PROCESSED", csvKey: "RWADAPV" },
+      { key: "RSADAPV", label: "RSADAPV (RSPV + Adaptive)", shortLabel: "RSADAPV", color: "var(--rsadapv)", tag: "PROCESSED", csvKey: "RSADAPV" }
+    ];
+
+    const getShorthand = (fileName) => { 
+      const m = fileName.match(/([-0-9.]+dB)/); 
+      return m ? 'input_' + m[1] : ''; 
+    };
+
+    const sampleCatalog = [
+      { fileName: "Acceleration_-0.99dB.wav", displayName: "Acceleration" },
+      { fileName: "AMBTraf_Highway (ID 0122)_BigSoundBank.com_SNR_-6.62dB.wav", displayName: "Highway Traffic" },
+      { fileName: "AMBTraf_Under a highway bridge (ID 0123)_BigSoundBank.com_SNR_-3.56dB.wav", displayName: "Under Highway Bridge" },
+      { fileName: "AMBUndr_Underground parking (ID 0604)_BigSoundBank.com_SNR_-1.50dB.wav", displayName: "Underground Parking" },
+      { fileName: "AMBUrbn_Paris apartment open window (ID 0081)_BigSoundBank.com_SNR_6.42dB.wav", displayName: "Paris Apartment Open Window" },
+      { fileName: "AMBUrbn_Parisian crossing 1 (ID 3030)_BigSoundBank.com_SNR_-2.09dB.wav", displayName: "Parisian Crossing" },
+      { fileName: "AMBUrbn_Parisian paved square fountain (ID 1081)_BigSoundBank.com_SNR_-1.01dB.wav", displayName: "Parisian Square Fountain" },
+      { fileName: "AMBUrbn_Parisian ring road (ID 1080)_BigSoundBank.com_SNR_-0.48dB.wav", displayName: "Parisian Ring Road" },
+      { fileName: "Door_slam_-7.19dB.wav", displayName: "Door Slam" },
+      { fileName: "Horn_honk_-12.94dB.wav", displayName: "Horn Honk" },
+      { fileName: "RAINGlas_Rain on car windshield (ID 1295)_BigSoundBank.com_SNR_6.34dB.wav", displayName: "Rain on Car Windshield" },
+      { fileName: "RAINGlas_Storm and rain on car windshield (ID 1296)_BigSoundBank.com_SNR_-0.27dB.wav", displayName: "Storm & Rain Windshield" },
+      { fileName: "Road_bumps_2.95dB.wav", displayName: "Road Bumps" },
+      { fileName: "Rough_surfaces_-2.31dB.wav", displayName: "Rough Surfaces" },
+      { fileName: "VEHCar_4 cars passing at 90 km h (ID 3434)_BigSoundBank.com_SNR_0.14dB.wav", displayName: "4 Cars Passing 90 km/h" },
+      { fileName: "VEHCar_Car arrival stop departure (ID 0187)_BigSoundBank.com_SNR_0.23dB.wav", displayName: "Car Arrival Stop Departure" },
+      { fileName: "VEHInt_Car interior 80km h (ID 0505)_BigSoundBank.com_SNR_-6.44dB.wav", displayName: "Car Interior 80 km/h" },
+      { fileName: "VEHInt_Cars interior off (ID 0557)_BigSoundBank.com_SNR_4.64dB.wav", displayName: "Cars Interior Off" },
+      { fileName: "Wind_-10.53dB.wav", displayName: "Wind" }
+    ];
+
+    function escapeHtml(text) {
+      return String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    const samples = sampleCatalog.map((entry, i) => {
+      const idx = String(i + 1).padStart(2, "0");
+      return { id: idx, displayName: entry.displayName, fileName: entry.fileName };
+    });
+    const sampleCount = samples.length;
+
+    const state = {
+      selected: samples[0].id,
+      visible: Object.fromEntries(algorithms.map((a) => [a.key, true]))
+    };
+
+    const sampleListEl = document.getElementById("sample-list");
+    const detailPanelEl = document.getElementById("detail-panel");
+    const legendEl = document.getElementById("legend");
+    const heroWaveEl = document.getElementById("hero-wave");
+    const activeAudios = new Set();
+
+    function formatTime(seconds) {
+      if (!Number.isFinite(seconds)) return "00:00";
+      const m = Math.floor(seconds / 60);
+      const s = Math.floor(seconds % 60);
+      return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+    }
+
+    function pauseOthers(currentAudio) {
+      activeAudios.forEach((audio) => {
+        if (audio !== currentAudio && !audio.paused) audio.pause();
+      });
+    }
+
+    function updateWaveState() {
+      const anyPlaying = Array.from(activeAudios).some((audio) => !audio.paused);
+      const wave = detailPanelEl.querySelector(".detail-wave");
+      if (wave) wave.classList.toggle("playing", anyPlaying);
+    }
+
+    function makeWaveBars(total) {
+      return Array.from({ length: total }, (_, i) => {
+        const delay = (i % 11) * 0.08;
+        const duration = 0.9 + ((i * 7) % 10) * 0.08;
+        return `<span style="animation-delay:${delay}s; animation-duration:${duration}s;"></span>`;
+      }).join("");
+    }
+
+    function createLegend() {
+      const pills = algorithms.map((algo) => {
+        const active = state.visible[algo.key];
+        return `<button class="pill" data-key="${algo.key}" data-active="${active}">
+          ${algo.label}
+        </button>`;
+      }).join("");
+
+      legendEl.innerHTML = `
+        ${pills}
+        <button class="pill pill-reset" data-action="reset">Reset</button>
+      `;
+    }
+
+    function createSampleList() {
+      sampleListEl.innerHTML = samples.map((sample) => {
+        const active = sample.id === state.selected;
+        return `
+          <button type="button" class="sample-item ${active ? "active" : ""}" data-sample="${sample.id}" title="${escapeHtml(sample.fileName)}">
+            <span>
+              <span class="sample-title">${escapeHtml(sample.displayName)}</span>
+              <span class="sample-meta">Sample ${sample.id}</span>
+            </span>
+            <span class="active-dot" aria-hidden="true"></span>
+          </button>
+        `;
+      }).join("");
+    }
+
+    function audioPath(folder, sample) {
+      if (folder === "noisy") {
+        return `data/input/${encodeURIComponent(sample.fileName)}`;
+      }
+      return `data/output/${folder}/${encodeURIComponent(sample.fileName)}`;
+    }
+
+    function createAudioCard({ key, shortLabel, color, tag }, sample) {
+      const file = audioPath(key, sample);
+      const ratingKey = `rating_${sample.id}_${key}`;
+      const savedRating = localStorage.getItem(ratingKey) || '';
+      return `
+        <article class="audio-card" data-algo="${key}" style="border-top-color:${color};">
+          <div class="card-head">
+            <div class="algo-label" style="color:${color};">${shortLabel}</div>
+            <div class="tag">${tag}</div>
+          </div>
+          <div class="player" data-color="${color}">
+            <div class="player-row">
+              <button class="play-btn" type="button" aria-label="Play or pause ${shortLabel}" data-role="toggle">▶</button>
+              <input class="seek" type="range" min="0" max="100" value="0" step="0.1" data-role="seek" style="color:${color};" />
+            </div>
+            <div class="time"><span data-role="current">00:00</span><span data-role="duration">--:--</span></div>
+            <audio class="native-audio" preload="none" src="${file}" data-role="audio" controls></audio>
+            <div class="missing" data-role="missing" hidden>Audio unavailable. Place file at <code>${file}</code></div>
+            
+            <div class="rating-wrap">
+              <div class="rating-label">Rate Output (/10)</div>
+              <div class="rating-input-container">
+                <input type="number" class="rating-input" data-sample="${sample.id}" data-algo="${key}" min="0" max="10" step="0.1" value="${savedRating}" placeholder="0.0">
+              </div>
+            </div>
+          </div>
+        </article>
+      `;
+    }
+
+
+    function createPlotsGrid(sample) {
+      const shorthand = getShorthand(sample.fileName);
+      if (!shorthand) return '';
+      const pngs = ['SNR_Improv.png', 'SegSNR_Improv.png', 'STOI_Out.png', 'MOS_S_Out.png', 'MOS_A_Out.png'];
+      let html = '<div class="plots-grid">';
+      pngs.forEach(png => {
+        html += `<figure class="plot-card">
+          <img src="Metric Plots/${encodeURIComponent(shorthand)}/${encodeURIComponent(png)}" alt="${png}" />
+          <figcaption>${png}</figcaption>
+        </figure>`;
+      });
+      html += '</div>';
+      return html;
+    }
+
+    function createInputCard(sample) {
+      const file = audioPath("noisy", sample);
+      return `
+        <article class="audio-card" data-algo="noisy" style="border-top-color:var(--danger);">
+          <div class="card-head">
+            <div class="algo-label" style="color:var(--danger);">Noisy Input</div>
+            <div class="tag">INPUT</div>
+          </div>
+          <div class="player">
+            <div class="player-row">
+              <button class="play-btn" type="button" aria-label="Play or pause noisy input" data-role="toggle">▶</button>
+              <input class="seek" type="range" min="0" max="100" value="0" step="0.1" data-role="seek" style="color:var(--danger);" />
+            </div>
+            <div class="time"><span data-role="current">00:00</span><span data-role="duration">--:--</span></div>
+            <audio class="native-audio" preload="none" src="${file}" data-role="audio" controls></audio>
+            <div class="missing" data-role="missing" hidden>Audio unavailable. Place file at <code>${file}</code></div>
+          </div>
+        </article>
+      `;
+    }
+
+    function renderDetail() {
+      const sample = samples.find((s) => s.id === state.selected) || samples[0];
+      const savedCdsid = localStorage.getItem('user_cdsid') || '';
+      detailPanelEl.innerHTML = `
+        <h2 class="detail-title">${escapeHtml(sample.displayName)} — Noisy input</h2>
+        <div class="detail-sub">Sample ${sample.id} · comparing 1 input + ${algorithms.length} denoised outputs · <code>${escapeHtml(sample.fileName)}</code></div>
+        <div class="detail-wave" aria-hidden="true">
+          ${Array.from({ length: 34 }, (_, i) => {
+            const d = 0.07 * (i % 9);
+            const dur = 0.95 + ((i * 5) % 8) * 0.09;
+            return `<span class="wave-bar" style="animation-delay:${d}s; animation-duration:${dur}s;"></span>`;
+          }).join("")}
+        </div>
+        <div class="cards-grid">
+          ${createInputCard(sample)}
+          ${algorithms.map((algo) => createAudioCard(algo, sample)).join("")}
+        </div>
+        
+        <div class="submit-actions">
+          ${sample.id === samples[samples.length - 1].id 
+            ? '<button class="submit-btn" id="submit-all-btn" type="button">Submit All Ratings</button>'
+            : '<button class="submit-btn" id="next-sample-btn" type="button">Next Sample</button>'}
+        </div>
+        
+        <h3 style="margin-top:2.5rem; margin-bottom:0.5rem; font-family:'Syne', sans-serif;">Metric Visualization Plots</h3>
+        ${createPlotsGrid(sample)}
+      `;
+      wirePlayers();
+      applyLegendVisibility();
+      updateWaveState();
+    }
+
+    function setSelected(sampleId) {
+      state.selected = sampleId;
+      createSampleList();
+      renderDetail();
+      const title = document.querySelector('.detail-title');
+      if (title) {
+        const offset = 150; // Account for the sticky legend bar
+        const top = title.getBoundingClientRect().top + window.scrollY - offset;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }
+    }
+
+    function applyLegendVisibility() {
+      detailPanelEl.querySelectorAll(".audio-card").forEach((card) => {
+        const algo = card.dataset.algo;
+        if (algo === "noisy") {
+          card.classList.remove("hidden");
+          return;
+        }
+        const visible = Boolean(state.visible[algo]);
+        card.classList.toggle("hidden", !visible);
+      });
+    }
+
+    function wirePlayers() {
+      detailPanelEl.querySelectorAll(".player").forEach((player) => {
+        const audio = player.querySelector('[data-role="audio"]');
+        const toggle = player.querySelector('[data-role="toggle"]');
+        const seek = player.querySelector('[data-role="seek"]');
+        const current = player.querySelector('[data-role="current"]');
+        const duration = player.querySelector('[data-role="duration"]');
+        const missing = player.querySelector('[data-role="missing"]');
+        if (!audio || !toggle || !seek || !current || !duration || !missing) return;
+
+        activeAudios.add(audio);
+
+        toggle.addEventListener("click", () => {
+          if (audio.paused) {
+            pauseOthers(audio);
+            audio.play().catch(() => {});
+          } else {
+            audio.pause();
+          }
+        });
+
+        seek.addEventListener("input", (e) => {
+          if (!audio.duration || Number.isNaN(audio.duration)) return;
+          const percent = Number(e.target.value) / 100;
+          audio.currentTime = audio.duration * percent;
+        });
+
+        audio.addEventListener("play", () => {
+          toggle.textContent = "❚❚";
+          pauseOthers(audio);
+          updateWaveState();
+        });
+
+        audio.addEventListener("pause", () => {
+          toggle.textContent = "▶";
+          updateWaveState();
+        });
+
+        audio.addEventListener("ended", () => {
+          toggle.textContent = "▶";
+          seek.value = "0";
+          current.textContent = "00:00";
+          updateWaveState();
+        });
+
+        audio.addEventListener("timeupdate", () => {
+          const ratio = audio.duration ? (audio.currentTime / audio.duration) * 100 : 0;
+          seek.value = String(Math.min(100, Math.max(0, ratio)));
+          current.textContent = formatTime(audio.currentTime);
+        });
+
+        audio.addEventListener("loadedmetadata", () => {
+          duration.textContent = formatTime(audio.duration);
+          missing.hidden = true;
+        });
+
+        audio.addEventListener("error", () => {
+          duration.textContent = "--:--";
+          missing.hidden = false;
+        });
+      });
+    }
+
+    sampleListEl.addEventListener("click", (event) => {
+      const btn = event.target.closest("[data-sample]");
+      if (!btn) return;
+      setSelected(btn.dataset.sample);
+    });
+
+    legendEl.addEventListener("click", (event) => {
+      const reset = event.target.closest("[data-action='reset']");
+      if (reset) {
+        algorithms.forEach((a) => { state.visible[a.key] = true; });
+        createLegend();
+        applyLegendVisibility();
+        return;
+      }
+
+      const pill = event.target.closest("[data-key]");
+      if (!pill) return;
+      const key = pill.dataset.key;
+      if (!(key in state.visible)) return;
+      state.visible[key] = !state.visible[key];
+      createLegend();
+      applyLegendVisibility();
+    });
+
+    document.getElementById("year").textContent = `Year: ${new Date().getFullYear()}`;
+    document.getElementById("stat-files").textContent = String(sampleCount);
+    document.getElementById("stat-algos").textContent = String(algorithms.length);
+    document.getElementById("stat-outputs").textContent = String(sampleCount * algorithms.length);
+
+    heroWaveEl.innerHTML = makeWaveBars(32);
+    createLegend();
+    createSampleList();
+    renderDetail();
+
+    // Modal Logic
+    const modalOverlay = document.getElementById('cdsid-modal-overlay');
+    const modalInput = document.getElementById('modal-cdsid-input');
+    const modalSubmit = document.getElementById('modal-cdsid-submit');
+
+    function checkCdsid() {
+      const savedCdsid = localStorage.getItem('user_cdsid');
+      if (savedCdsid) {
+        modalOverlay.classList.add('hidden');
+      } else {
+        modalOverlay.classList.remove('hidden');
+        modalInput.focus();
+      }
+    }
+
+    modalSubmit.addEventListener('click', () => {
+      const val = modalInput.value.trim().toUpperCase();
+      if (!val) {
+        alert("Please enter a valid CDSID.");
+        return;
+      }
+      if (!/^[A-Z0-9]+$/.test(val)) {
+        alert("CDSID can only contain letters and numbers. No special characters are allowed.");
+        return;
+      }
+      localStorage.setItem('user_cdsid', val);
+      modalOverlay.classList.add('hidden');
+    });
+
+    checkCdsid();
+
+    detailPanelEl.addEventListener('click', async (e) => {
+      if (e.target.id === 'next-sample-btn') {
+        // Validate current sample
+        const ratings = {};
+        detailPanelEl.querySelectorAll('.rating-input').forEach(input => {
+          const val = parseFloat(input.value);
+          if (!isNaN(val)) ratings[input.dataset.algo] = val;
+        });
+
+        const totalInputs = detailPanelEl.querySelectorAll('.rating-input').length;
+        if (Object.keys(ratings).length < totalInputs) {
+          alert(`Please provide a rating for all ${totalInputs} algorithms before moving to the next sample.`);
+          return;
+        }
+
+        // Find current index and move to next
+        const currentIndex = samples.findIndex(s => s.id === state.selected);
+        if (currentIndex < samples.length - 1) {
+          setSelected(samples[currentIndex + 1].id);
+        }
+      }
+
+      if (e.target.id === 'submit-all-btn') {
+        const btn = e.target;
+        const cdsid = localStorage.getItem('user_cdsid');
+
+        if (!cdsid) {
+          alert("Your session has lost your CDSID. Please refresh the page.");
+          return;
+        }
+
+        // Validate final sample
+        const currentRatings = {};
+        detailPanelEl.querySelectorAll('.rating-input').forEach(input => {
+          const val = parseFloat(input.value);
+          if (!isNaN(val)) currentRatings[input.dataset.algo] = val;
+        });
+        
+        const totalInputs = detailPanelEl.querySelectorAll('.rating-input').length;
+        if (Object.keys(currentRatings).length < totalInputs) {
+          alert(`Please provide a rating for all ${totalInputs} algorithms before submitting.`);
+          return;
+        }
+
+        // Gather all ratings
+        const allData = {};
+        const missingSamples = [];
+        
+        for (const s of samples) {
+          const sampleRatings = {};
+          let missingCount = 0;
+          for (const algo of algorithms) {
+            const valStr = localStorage.getItem(`rating_${s.id}_${algo.key}`);
+            const val = parseFloat(valStr);
+            if (!isNaN(val)) {
+              sampleRatings[algo.key] = val;
+            } else {
+              missingCount++;
+            }
+          }
+          if (missingCount > 0) {
+            missingSamples.push(s.displayName);
+          } else {
+            allData[s.id] = sampleRatings;
+          }
+        }
+
+        if (missingSamples.length > 0) {
+          alert(`You are missing ratings for the following files:\n\n${missingSamples.map(name => `- ${name}`).join('\n')}\n\nPlease click on them in the left sidebar and complete them.`);
+          return;
+        }
+
+        const originalText = btn.textContent;
+        btn.textContent = "Submitting...";
+        btn.disabled = true;
+
+        try {
+          const docRef = doc(db, "ratings", cdsid);
+          
+          // Check for duplicate submission
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            alert("You have already submitted an evaluation. Thank you!");
+            btn.textContent = originalText;
+            btn.disabled = false;
+            return;
+          }
+
+          await setDoc(docRef, {
+            cdsid: cdsid,
+            samples: allData,
+            timestamp: serverTimestamp()
+          });
+
+          // Clear local storage
+          samples.forEach(s => {
+            algorithms.forEach(algo => {
+              localStorage.removeItem(`rating_${s.id}_${algo.key}`);
+            });
+          });
+          
+          alert("Thank you! All your ratings have been successfully submitted.");
+          
+          // Optionally clear the UI inputs
+          detailPanelEl.querySelectorAll('.rating-input').forEach(input => input.value = '');
+          
+        } catch (error) {
+          console.error("Error adding document: ", error);
+          alert("Error saving ratings. Please check your console.");
+        }
+
+        btn.textContent = originalText;
+        btn.disabled = false;
+      }
+    });
+
+    detailPanelEl.addEventListener('input', (e) => {
+      if (e.target.classList.contains('rating-input')) {
+        let val = parseFloat(e.target.value);
+        if (isNaN(val)) return;
+        if (val < 0) val = 0;
+        if (val > 10) val = 10;
+        
+        const sampleId = e.target.dataset.sample;
+        const algoKey = e.target.dataset.algo;
+        
+        localStorage.setItem(`rating_${sampleId}_${algoKey}`, val);
+      }
+    });
+  </script>
+</body>
+</html>
+
