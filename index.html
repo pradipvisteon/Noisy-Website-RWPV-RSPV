@@ -790,7 +790,7 @@
       <p id="modal-desc">Please enter your CDSID and password to begin.</p>
       <input type="text" id="modal-cdsid-input" class="cdsid-input" placeholder="Enter CDSID" />
       <div style="position: relative;">
-        <input type="password" id="modal-password-input" class="cdsid-input" placeholder="Password" style="margin-bottom: 1rem; width: 100%; padding-right: 40px;"/>
+        <input type="password" id="modal-password-input" class="cdsid-input" placeholder="Password" style="margin-bottom: 1rem; width: 100%; padding-right: 40px; text-transform: none;"/>
         <span id="modal-pwd-toggle" style="position: absolute; right: 12px; top: 12px; cursor: pointer; color: var(--muted); font-size: 1.2rem;">👁️</span>
       </div>
       <div id="modal-error" style="color: var(--danger); font-size: 0.85rem; margin-bottom: 1rem; display: none;"></div>
@@ -946,7 +946,8 @@
 
     const state = {
       selected: samples[0].id,
-      visible: Object.fromEntries(algorithms.map((a) => [a.key, true]))
+      visible: Object.fromEntries(algorithms.map((a) => [a.key, true])),
+      firebaseRatings: null
     };
 
     const sampleListEl = document.getElementById("sample-list");
@@ -1021,8 +1022,9 @@
     function createAudioCard({ key, shortLabel, color, tag }, sample) {
       const file = audioPath(key, sample);
       const savedCdsid = localStorage.getItem('user_cdsid') || '';
-      const ratingKey = `rating_${savedCdsid}_${sample.id}_${key}`;
-      const savedRating = localStorage.getItem(ratingKey) || '';
+      const isCompleted = state.firebaseRatings && state.firebaseRatings[sample.displayName];
+      const firebaseRating = isCompleted && state.firebaseRatings[sample.displayName][key] !== undefined ? state.firebaseRatings[sample.displayName][key] : null;
+      const savedRating = firebaseRating !== null ? firebaseRating : (localStorage.getItem(`rating_${savedCdsid}_${sample.id}_${key}`) || '');
       return `
         <article class="audio-card" data-algo="${key}" style="border-top-color:${color};">
           <div class="card-head">
@@ -1041,7 +1043,7 @@
             <div class="rating-wrap">
               <div class="rating-label">Rate Output (/10)</div>
               <div class="rating-input-container">
-                <input type="number" class="rating-input" data-sample="${sample.id}" data-algo="${key}" min="0" max="10" step="0.1" value="${savedRating}" placeholder="0.0">
+                <input type="number" class="rating-input" data-sample="${sample.id}" data-algo="${key}" min="0" max="10" step="0.1" value="${savedRating}" placeholder="0.0" ${isCompleted ? 'disabled style="background: rgba(0,255,0,0.1); cursor: not-allowed; color: var(--success);"' : ''}>
               </div>
             </div>
           </div>
@@ -1127,7 +1129,10 @@
         </div>
         
         <div class="submit-actions">
-          <button class="submit-btn" id="submit-ratings-btn" type="button">Submit Ratings</button>
+          ${(state.firebaseRatings && state.firebaseRatings[sample.displayName]) 
+            ? `<button class="submit-btn" disabled style="background: var(--success); cursor: default; border-color: var(--success);">Already Submitted</button>`
+            : `<button class="submit-btn" id="submit-ratings-btn" type="button">Submit Ratings</button>`
+          }
         </div>
         
         <h3 style="margin-top:2.5rem; margin-bottom:0.5rem; font-family:'Syne', sans-serif;">Metric Visualization Plots</h3>
@@ -1321,6 +1326,7 @@
 
         if (docSnap.exists()) {
           const data = docSnap.data();
+          state.firebaseRatings = data.samples || {};
           if (data.password) {
             if (data.password !== pwd) {
               modalError.textContent = "Incorrect password.";
@@ -1412,6 +1418,14 @@
           return;
         }
 
+        const scores = Object.values(ratings);
+        const maxScore = Math.max(...scores);
+        const maxScoreCount = scores.filter(s => s === maxScore).length;
+        if (maxScoreCount > 1) {
+          showToast("Only One WINNER | NO TIE ALLOWED", true);
+          return;
+        }
+
         const originalText = btn.textContent;
         btn.textContent = "Saving...";
         btn.disabled = true;
@@ -1464,6 +1478,9 @@
           }
 
           await setDoc(docRef, updateData, { merge: true });
+          
+          if (!state.firebaseRatings) state.firebaseRatings = {};
+          state.firebaseRatings[sample.displayName] = ratings;
 
           // Clear inputs and remove from local storage
           detailPanelEl.querySelectorAll('.rating-input').forEach(input => {
@@ -1600,7 +1617,7 @@
                 <div class="detail-sub">Please enter the password for ${selectedCdsid}</div>
                 <div style="margin-top: 2rem; max-width: 400px;">
                   <div style="position: relative;">
-                    <input type="password" id="rankings-pwd-input" class="cdsid-input" placeholder="Password" style="margin-bottom: 1rem; width: 100%; padding-right: 40px;"/>
+                    <input type="password" id="rankings-pwd-input" class="cdsid-input" placeholder="Password" style="margin-bottom: 1rem; width: 100%; padding-right: 40px; text-transform: none;"/>
                     <span id="rankings-pwd-toggle" style="position: absolute; right: 12px; top: 12px; cursor: pointer; color: var(--muted); font-size: 1.2rem;">👁️</span>
                   </div>
                   <div id="rankings-error" style="color: var(--danger); font-size: 0.85rem; margin-bottom: 1rem; display: none;">Incorrect password!</div>
@@ -1726,10 +1743,10 @@
                         csvRows.push(`${s.displayName},${dbVal},Not Rated,-,-,-,-,-,-,-,-,-`);
                       }
                     });
-                    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("%0A");
-                    const encodedUri = encodeURI(csvContent);
+                    const blob = new Blob([csvRows.join("\n")], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
                     const link = document.createElement("a");
-                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("href", url);
                     link.setAttribute("download", `${selectedCdsid}_all_ratings.csv`);
                     document.body.appendChild(link);
                     link.click();
