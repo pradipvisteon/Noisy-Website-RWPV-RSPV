@@ -789,7 +789,10 @@
       <h3 id="modal-title">Welcome to the Evaluation</h3>
       <p id="modal-desc">Please enter your CDSID and password to begin.</p>
       <input type="text" id="modal-cdsid-input" class="cdsid-input" placeholder="Enter CDSID" />
-      <input type="password" id="modal-password-input" class="cdsid-input" placeholder="Password" style="margin-bottom: 1rem;"/>
+      <div style="position: relative;">
+        <input type="password" id="modal-password-input" class="cdsid-input" placeholder="Password" style="margin-bottom: 1rem; width: 100%; padding-right: 40px;"/>
+        <span id="modal-pwd-toggle" style="position: absolute; right: 12px; top: 12px; cursor: pointer; color: var(--muted); font-size: 1.2rem;">👁️</span>
+      </div>
       <div id="modal-error" style="color: var(--danger); font-size: 0.85rem; margin-bottom: 1rem; display: none;"></div>
       <button id="modal-cdsid-submit" class="submit-btn" style="width: 100%;">Start Rating</button>
     </div>
@@ -872,6 +875,20 @@
         toast.classList.add('fade-out');
         setTimeout(() => toast.remove(), 300);
       }, 4000);
+    }
+
+    const modalPwdToggle = document.getElementById('modal-pwd-toggle');
+    const modalPwdInput = document.getElementById('modal-password-input');
+    if (modalPwdToggle) {
+      modalPwdToggle.addEventListener('click', () => {
+        if (modalPwdInput.type === 'password') {
+          modalPwdInput.type = 'text';
+          modalPwdToggle.textContent = '🔒';
+        } else {
+          modalPwdInput.type = 'password';
+          modalPwdToggle.textContent = '👁️';
+        }
+      });
     }
 
     const algorithms = [
@@ -1575,7 +1592,10 @@
                 <h2 class="detail-title">Enter Password</h2>
                 <div class="detail-sub">Please enter the password for ${selectedCdsid}</div>
                 <div style="margin-top: 2rem; max-width: 400px;">
-                  <input type="password" id="rankings-pwd-input" class="cdsid-input" placeholder="Password" style="margin-bottom: 1rem;"/>
+                  <div style="position: relative;">
+                    <input type="password" id="rankings-pwd-input" class="cdsid-input" placeholder="Password" style="margin-bottom: 1rem; width: 100%; padding-right: 40px;"/>
+                    <span id="rankings-pwd-toggle" style="position: absolute; right: 12px; top: 12px; cursor: pointer; color: var(--muted); font-size: 1.2rem;">👁️</span>
+                  </div>
                   <div id="rankings-error" style="color: var(--danger); font-size: 0.85rem; margin-bottom: 1rem; display: none;">Incorrect password!</div>
                   <button id="rankings-pwd-submit" class="submit-btn" style="width: 100%;">View Results</button>
                 </div>
@@ -1587,6 +1607,17 @@
               const pwdError = document.getElementById('rankings-error');
 
               pwdInput.focus();
+
+              const pwdToggle = document.getElementById('rankings-pwd-toggle');
+              pwdToggle.addEventListener('click', () => {
+                if (pwdInput.type === 'password') {
+                  pwdInput.type = 'text';
+                  pwdToggle.textContent = '🔒';
+                } else {
+                  pwdInput.type = 'password';
+                  pwdToggle.textContent = '👁️';
+                }
+              });
 
               const verifyAndRender = () => {
                 const pwd = pwdInput.value.trim();
@@ -1655,7 +1686,10 @@
                   detailPanelEl.innerHTML = `
                     <h2 class="detail-title" style="margin-top:2rem;">Rankings for ${selectedCdsid}</h2>
                     <div class="detail-sub">Total files rated: ${totalFilesRated} / 19. <b>Click a bar to see the specific files!</b></div>
-                    <button id="rankings-back-btn" class="submit-btn" style="margin-top: 1rem; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem;">&larr; Back to Users</button>
+                    <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
+                      <button id="rankings-back-btn" class="submit-btn" style="background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem;">&larr; Back to Users</button>
+                      <button id="chart-csv-btn" class="submit-btn" style="background: var(--sqa); color: var(--bg); padding: 0.5rem 1rem;">Download Full CSV</button>
+                    </div>
                     <div style="margin-top: 2rem; background: var(--panel-2); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border);">
                       ${barsHtml}
                     </div>
@@ -1663,6 +1697,38 @@
 
                   document.getElementById('rankings-back-btn').addEventListener('click', renderUsersList);
                   
+                  document.getElementById('chart-csv-btn').addEventListener('click', () => {
+                    let csvRows = ["File Name,dB,Winner,WebRTC,SQA,RNN,HybridRW,HybridRS,RWPV,RSPV,RWADAPV,RSADAPV"];
+                    samples.forEach(s => {
+                      const fileRatings = userData.samples ? userData.samples[s.displayName] : null;
+                      let m = s.fileName.match(/([-0-9.]+dB)/);
+                      let dbVal = m ? m[1] : "-";
+                      if (fileRatings) {
+                        let highest = -1;
+                        let winner = "Tie";
+                        for (const [algo, score] of Object.entries(fileRatings)) {
+                          if (score > highest) {
+                            highest = score;
+                            winner = algoLabels[algo] || algo;
+                          } else if (score === highest && highest > 0) {
+                            winner = "Tie";
+                          }
+                        }
+                        csvRows.push(`${s.displayName},${dbVal},${winner},${fileRatings.WebRTC||0},${fileRatings.sqa||0},${fileRatings.RNN||0},${fileRatings.HybridRW||0},${fileRatings.HybridRS||0},${fileRatings.RWPV||0},${fileRatings.RSPV||0},${fileRatings.RWADAPV||0},${fileRatings.RSADAPV||0}`);
+                      } else {
+                        csvRows.push(`${s.displayName},${dbVal},Not Rated,-,-,-,-,-,-,-,-,-`);
+                      }
+                    });
+                    const csvContent = "data:text/csv;charset=utf-8," + csvRows.join("%0A");
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", `${selectedCdsid}_all_ratings.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  });
+
                   detailPanelEl.querySelectorAll('.personal-bar').forEach(bar => {
                     bar.addEventListener('mouseenter', () => bar.style.background = 'rgba(255,255,255,0.05)');
                     bar.addEventListener('mouseleave', () => bar.style.background = 'transparent');
@@ -1682,10 +1748,7 @@
                   let tableHtml = `
                     <h2 class="detail-title" style="margin-top:2rem;">Files won by <span style="color:${algoColors[algo]}">${algoLabels[algo]}</span></h2>
                     <div class="detail-sub">User: ${selectedCdsid}</div>
-                    <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
-                      <button id="table-back-btn" class="submit-btn" style="background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem;">&larr; Back to Chart</button>
-                      <button id="table-csv-btn" class="submit-btn" style="background: var(--sqa); color: var(--bg); padding: 0.5rem 1rem;">Download CSV</button>
-                    </div>
+                    <button id="table-back-btn" class="submit-btn" style="margin-top: 1rem; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem;">&larr; Back to Chart</button>
                     <div style="overflow-x:auto;">
                     <table style="width:100%; margin-top:1.5rem; border-collapse:collapse; font-size:0.85rem; text-align:left;">
                       <tr style="border-bottom:1px solid var(--border); background:rgba(255,255,255,0.05);">
@@ -1708,21 +1771,6 @@
                   tableHtml += `</table></div>`;
                   detailPanelEl.innerHTML = tableHtml;
                   document.getElementById('table-back-btn').addEventListener('click', renderChart);
-                  
-                  document.getElementById('table-csv-btn').addEventListener('click', () => {
-                    let csvContent = "data:text/csv;charset=utf-8,";
-                    csvContent += "Algo Name,File Name,dB,Score\\n";
-                    files.forEach(f => {
-                      csvContent += `${algoLabels[algo]},${f.displayName},${f.dbVal},${f.maxScore}\\n`;
-                    });
-                    const encodedUri = encodeURI(csvContent);
-                    const link = document.createElement("a");
-                    link.setAttribute("href", encodedUri);
-                    link.setAttribute("download", `${selectedCdsid}_${algoLabels[algo]}_wins.csv`);
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                  });
 
                   detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 };
