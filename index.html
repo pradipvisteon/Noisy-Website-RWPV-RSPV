@@ -970,6 +970,27 @@
       return html;
     }
 
+    function createCleanCard() {
+      const file = "clean.wav";
+      return `
+        <article class="audio-card" data-algo="clean" style="border-top-color:#38d9ff;">
+          <div class="card-head">
+            <div class="algo-label" style="color:#38d9ff;">Clean Speech</div>
+            <div class="tag">REFERENCE</div>
+          </div>
+          <div class="player">
+            <div class="player-row">
+              <button class="play-btn" type="button" aria-label="Play or pause clean speech" data-role="toggle">▶</button>
+              <input class="seek" type="range" min="0" max="100" value="0" step="0.1" data-role="seek" style="color:#38d9ff;" />
+            </div>
+            <div class="time"><span data-role="current">00:00</span><span data-role="duration">--:--</span></div>
+            <audio class="native-audio" preload="none" src="${file}" data-role="audio" controls></audio>
+            <div class="missing" data-role="missing" hidden>Audio unavailable. Place file at <code>${file}</code></div>
+          </div>
+        </article>
+      `;
+    }
+
     function createInputCard(sample) {
       const file = audioPath("noisy", sample);
       return `
@@ -995,8 +1016,8 @@
       const sample = samples.find((s) => s.id === state.selected) || samples[0];
       const savedCdsid = localStorage.getItem('user_cdsid') || '';
       detailPanelEl.innerHTML = `
-        <h2 class="detail-title">${escapeHtml(sample.displayName)} — Noisy input</h2>
-        <div class="detail-sub">Sample ${sample.id} · comparing 1 input + ${algorithms.length} denoised outputs · <code>${escapeHtml(sample.fileName)}</code></div>
+        <h2 class="detail-title">${escapeHtml(sample.displayName)}</h2>
+        <div class="detail-sub">Sample ${sample.id} · comparing clean reference + noisy input + ${algorithms.length} denoised outputs · <code>${escapeHtml(sample.fileName)}</code></div>
         <div class="detail-wave" aria-hidden="true">
           ${Array.from({ length: 34 }, (_, i) => {
             const d = 0.07 * (i % 9);
@@ -1005,6 +1026,7 @@
           }).join("")}
         </div>
         <div class="cards-grid">
+          ${createCleanCard()}
           ${createInputCard(sample)}
           ${algorithms.map((algo) => createAudioCard(algo, sample)).join("")}
         </div>
@@ -1036,7 +1058,7 @@
     function applyLegendVisibility() {
       detailPanelEl.querySelectorAll(".audio-card").forEach((card) => {
         const algo = card.dataset.algo;
-        if (algo === "noisy") {
+        if (algo === "noisy" || algo === "clean") {
           card.classList.remove("hidden");
           return;
         }
