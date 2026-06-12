@@ -1513,23 +1513,14 @@
                   return;
                 }
 
-                let tableHtml = `
-                  <h2 class="detail-title" style="margin-top:2rem;">Rankings for ${selectedCdsid}</h2>
-                  <div class="detail-sub">Showing the winning algorithm for each rated file.</div>
-                  <button id="rankings-back-btn" class="submit-btn" style="margin-top: 1rem; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem;">&larr; Back to Users</button>
-                  <div style="overflow-x:auto;">
-                  <table style="width:100%; margin-top:1.5rem; border-collapse:collapse; font-size:0.85rem; text-align:left;">
-                    <tr style="border-bottom:1px solid var(--border); background:rgba(255,255,255,0.05);">
-                      <th style="padding:0.85rem;">Algo Name</th>
-                      <th style="padding:0.85rem;">File Name</th>
-                      <th style="padding:0.85rem;">dB</th>
-                      <th style="padding:0.85rem;">Score</th>
-                    </tr>
-                `;
+                // Calculate personal totals and map files to winners
+                const personalTotals = { WebRTC:0, sqa:0, RNN:0, HybridRW:0, HybridRS:0, RWPV:0, RSPV:0, RWADAPV:0, RSADAPV:0 };
+                const algoFilesMap = { WebRTC:[], sqa:[], RNN:[], HybridRW:[], HybridRS:[], RWPV:[], RSPV:[], RWADAPV:[], RSADAPV:[] };
+                let totalFilesRated = 0;
 
                 samples.forEach(s => {
                   const fileRatings = userData.samples ? userData.samples[s.displayName] : null;
-                  let winner = "-";
+                  let winner = null;
                   let maxScore = "-";
                   let dbVal = "-";
                   
@@ -1545,23 +1536,97 @@
                       }
                     }
                     maxScore = highest;
+                    if (winner) {
+                      if (personalTotals[winner] !== undefined) personalTotals[winner]++;
+                      if (algoFilesMap[winner]) {
+                        algoFilesMap[winner].push({ displayName: s.displayName, dbVal, maxScore });
+                      }
+                      totalFilesRated++;
+                    }
                   }
-
-                  tableHtml += `
-                    <tr style="border-bottom:1px solid #1a222d;">
-                      <td style="padding:0.85rem; font-weight:bold; color:var(--sqa);">${winner}</td>
-                      <td style="padding:0.85rem;">${s.displayName}</td>
-                      <td style="padding:0.85rem;">${dbVal}</td>
-                      <td style="padding:0.85rem;">${maxScore}</td>
-                    </tr>
-                  `;
                 });
 
-                tableHtml += `</table></div>`;
-                detailPanelEl.innerHTML = tableHtml;
-                detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                const renderChart = () => {
+                  let maxWins = Math.max(...Object.values(personalTotals), 1);
+                  let barsHtml = '';
+                  const algoLabels = { WebRTC: "WebRTC", sqa: "SQA", RNN: "RNN", HybridRW: "HybridRW", HybridRS: "HybridRS", RWPV: "RWPV", RSPV: "RSPV", RWADAPV: "RWADAPV", RSADAPV: "RSADAPV" };
+                  const algoColors = { WebRTC: "var(--webrtc)", sqa: "var(--sqa)", RNN: "var(--rnn)", HybridRW: "var(--hybridrw)", HybridRS: "var(--hybridrs)", RWPV: "var(--rwpv)", RSPV: "var(--rspv)", RWADAPV: "var(--rwadapv)", RSADAPV: "var(--rsadapv)" };
 
-                document.getElementById('rankings-back-btn').addEventListener('click', renderUsersList);
+                  for (const [algo, count] of Object.entries(personalTotals)) {
+                    if (count === 0) continue; // Only show algos that won at least once
+                    const pct = (count / maxWins) * 100;
+                    barsHtml += `
+                      <div class="personal-bar" data-algo="${algo}" style="margin-bottom: 1rem; cursor: pointer; padding: 0.5rem; border-radius: 4px; transition: background 0.2s;">
+                        <div style="display:flex; justify-content:space-between; font-size: 0.85rem; margin-bottom: 0.3rem; pointer-events: none;">
+                          <span style="color:${algoColors[algo]};">${algoLabels[algo]}</span>
+                          <span style="color:var(--text);">${count} wins &rarr;</span>
+                        </div>
+                        <div style="width: 100%; height: 24px; background: rgba(255,255,255,0.05); border-radius: 4px; overflow: hidden; pointer-events: none;">
+                          <div style="width: ${pct}%; height: 100%; background: ${algoColors[algo]}; transition: width 0.5s ease;"></div>
+                        </div>
+                      </div>
+                    `;
+                  }
+
+                  if (barsHtml === '') barsHtml = '<div class="detail-sub">No ratings found for this user.</div>';
+
+                  detailPanelEl.innerHTML = `
+                    <h2 class="detail-title" style="margin-top:2rem;">Rankings for ${selectedCdsid}</h2>
+                    <div class="detail-sub">Total files rated: ${totalFilesRated} / 19. <b>Click a bar to see the specific files!</b></div>
+                    <button id="rankings-back-btn" class="submit-btn" style="margin-top: 1rem; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem;">&larr; Back to Users</button>
+                    <div style="margin-top: 2rem; background: var(--panel-2); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border);">
+                      ${barsHtml}
+                    </div>
+                  `;
+
+                  document.getElementById('rankings-back-btn').addEventListener('click', renderUsersList);
+                  
+                  detailPanelEl.querySelectorAll('.personal-bar').forEach(bar => {
+                    bar.addEventListener('mouseenter', () => bar.style.background = 'rgba(255,255,255,0.05)');
+                    bar.addEventListener('mouseleave', () => bar.style.background = 'transparent');
+                    bar.addEventListener('click', () => {
+                      renderTable(bar.dataset.algo);
+                    });
+                  });
+
+                  detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                };
+
+                const renderTable = (algo) => {
+                  const files = algoFilesMap[algo];
+                  const algoLabels = { WebRTC: "WebRTC", sqa: "SQA", RNN: "RNN", HybridRW: "HybridRW", HybridRS: "HybridRS", RWPV: "RWPV", RSPV: "RSPV", RWADAPV: "RWADAPV", RSADAPV: "RSADAPV" };
+                  const algoColors = { WebRTC: "var(--webrtc)", sqa: "var(--sqa)", RNN: "var(--rnn)", HybridRW: "var(--hybridrw)", HybridRS: "var(--hybridrs)", RWPV: "var(--rwpv)", RSPV: "var(--rspv)", RWADAPV: "var(--rwadapv)", RSADAPV: "var(--rsadapv)" };
+                  
+                  let tableHtml = `
+                    <h2 class="detail-title" style="margin-top:2rem;">Files won by <span style="color:${algoColors[algo]}">${algoLabels[algo]}</span></h2>
+                    <div class="detail-sub">User: ${selectedCdsid}</div>
+                    <button id="table-back-btn" class="submit-btn" style="margin-top: 1rem; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem;">&larr; Back to Chart</button>
+                    <div style="overflow-x:auto;">
+                    <table style="width:100%; margin-top:1.5rem; border-collapse:collapse; font-size:0.85rem; text-align:left;">
+                      <tr style="border-bottom:1px solid var(--border); background:rgba(255,255,255,0.05);">
+                        <th style="padding:0.85rem;">File Name</th>
+                        <th style="padding:0.85rem;">dB</th>
+                        <th style="padding:0.85rem;">Score</th>
+                      </tr>
+                  `;
+
+                  files.forEach(f => {
+                    tableHtml += `
+                      <tr style="border-bottom:1px solid #1a222d;">
+                        <td style="padding:0.85rem;">${f.displayName}</td>
+                        <td style="padding:0.85rem;">${f.dbVal}</td>
+                        <td style="padding:0.85rem;">${f.maxScore}</td>
+                      </tr>
+                    `;
+                  });
+
+                  tableHtml += `</table></div>`;
+                  detailPanelEl.innerHTML = tableHtml;
+                  document.getElementById('table-back-btn').addEventListener('click', renderChart);
+                  detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                };
+
+                renderChart();
               };
 
               pwdSubmit.addEventListener('click', verifyAndRender);
