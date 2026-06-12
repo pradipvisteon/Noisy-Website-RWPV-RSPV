@@ -1020,7 +1020,8 @@
 
     function createAudioCard({ key, shortLabel, color, tag }, sample) {
       const file = audioPath(key, sample);
-      const ratingKey = `rating_${sample.id}_${key}`;
+      const savedCdsid = localStorage.getItem('user_cdsid') || '';
+      const ratingKey = `rating_${savedCdsid}_${sample.id}_${key}`;
       const savedRating = localStorage.getItem(ratingKey) || '';
       return `
         <article class="audio-card" data-algo="${key}" style="border-top-color:${color};">
@@ -1428,6 +1429,11 @@
               btn.textContent = originalText;
               btn.disabled = false;
               
+              detailPanelEl.querySelectorAll('.rating-input').forEach(input => {
+                input.value = '';
+                localStorage.removeItem(`rating_${cdsid}_${sample.id}_${input.dataset.algo}`);
+              });
+
               // Push them to next available if possible
               const currentIndex = samples.findIndex(s => s.id === state.selected);
               if (currentIndex < samples.length - 1) {
@@ -1462,7 +1468,7 @@
           // Clear inputs and remove from local storage
           detailPanelEl.querySelectorAll('.rating-input').forEach(input => {
             input.value = '';
-            localStorage.removeItem(`rating_${sample.id}_${input.dataset.algo}`);
+            localStorage.removeItem(`rating_${cdsid}_${sample.id}_${input.dataset.algo}`);
           });
 
           // Move to next sample if not at the end
@@ -1507,8 +1513,9 @@
         
         const sampleId = e.target.dataset.sample;
         const algoKey = e.target.dataset.algo;
+        const cdsid = localStorage.getItem('user_cdsid') || '';
         
-        localStorage.setItem(`rating_${sampleId}_${algoKey}`, val);
+        localStorage.setItem(`rating_${cdsid}_${sampleId}_${algoKey}`, val);
       }
     });
 
