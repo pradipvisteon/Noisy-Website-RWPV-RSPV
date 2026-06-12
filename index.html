@@ -17,6 +17,7 @@
       --text: #e7edf5;
       --muted: #8f9bad;
       --border: #1f2630;
+      --success: #44d97e;
       --danger: #ff4f4f;
       --webrtc: #44d97e;
       --sqa: #38d9ff;
@@ -1130,7 +1131,7 @@
         
         <div class="submit-actions">
           ${(state.firebaseRatings && state.firebaseRatings[sample.displayName]) 
-            ? `<button class="submit-btn" disabled style="background: var(--success); cursor: default; border-color: var(--success);">Already Submitted</button>`
+            ? `<button class="submit-btn" disabled style="background: var(--success); cursor: default; border-color: var(--success); color: #000; opacity: 1;">Already Submitted</button>`
             : `<button class="submit-btn" id="submit-ratings-btn" type="button">Submit Ratings</button>`
           }
         </div>
