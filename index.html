@@ -1456,6 +1456,7 @@
             ${barsHtml}
           </div>
         `;
+        detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
       } catch (e) {
         detailPanelEl.innerHTML = `<h2 class="detail-title">Error loading stats</h2><p>${e.message}</p>`;
       }
@@ -1480,6 +1481,7 @@
             <div class="detail-sub">Select a user to view their detailed rankings.</div>
             ${usersHtml}
           `;
+          detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
           detailPanelEl.querySelectorAll('.cdsid-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -1557,6 +1559,7 @@
 
                 tableHtml += `</table></div>`;
                 detailPanelEl.innerHTML = tableHtml;
+                detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
                 document.getElementById('rankings-back-btn').addEventListener('click', renderUsersList);
               };
