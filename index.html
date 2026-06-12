@@ -725,9 +725,65 @@
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
+
+    #toast-container {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .toast {
+      background: var(--panel-2);
+      border-left: 4px solid var(--sqa);
+      color: var(--text);
+      padding: 1rem 1.5rem;
+      border-radius: var(--radius-sm);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      font-size: 0.95rem;
+      animation: slideIn 0.3s ease forwards;
+      opacity: 0;
+      transform: translateX(100%);
+      max-width: 350px;
+    }
+    .toast.error {
+      border-left-color: var(--danger);
+    }
+    .toast.fade-out {
+      animation: fadeOut 0.3s ease forwards;
+    }
+    @keyframes slideIn {
+      to { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes fadeOut {
+      to { opacity: 0; transform: translateX(100%); }
+    }
+
+    @media (max-width: 900px) {
+      .main-layout {
+        grid-template-columns: 1fr;
+      }
+      .grid-3 {
+        grid-template-columns: 1fr;
+      }
+      .hero-top {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+      }
+      .detail-panel {
+        padding: var(--space-2);
+      }
+      .container {
+        padding: 0 1rem;
+      }
+    }
   </style>
 </head>
 <body>
+  <div id="toast-container"></div>
   <div id="cdsid-modal-overlay" class="modal-overlay">
     <div class="modal-content">
       <h3 id="modal-title">Welcome to the Evaluation</h3>
@@ -817,6 +873,18 @@
       { key: "RWADAPV", label: "RWADAPV (RWPV + Adaptive)", shortLabel: "RWADAPV", color: "var(--rwadapv)", tag: "PROCESSED", csvKey: "RWADAPV" },
       { key: "RSADAPV", label: "RSADAPV (RSPV + Adaptive)", shortLabel: "RSADAPV", color: "var(--rsadapv)", tag: "PROCESSED", csvKey: "RSADAPV" }
     ];
+
+    function showToast(msg, isError = false) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = 'toast' + (isError ? ' error' : '');
+      toast.textContent = msg;
+      container.appendChild(toast);
+      setTimeout(() => {
+        toast.classList.add('fade-out');
+        setTimeout(() => toast.remove(), 300);
+      }, 1500);
+    }
 
     const getShorthand = (fileName) => { 
       const m = fileName.match(/([-0-9.]+dB)/); 
@@ -1309,7 +1377,7 @@
         const cdsid = localStorage.getItem('user_cdsid');
 
         if (!cdsid) {
-          alert("Your session has lost your CDSID. Please refresh the page.");
+          showToast("Your session has lost your CDSID. Please refresh the page.", true);
           return;
         }
 
@@ -1322,7 +1390,7 @@
 
         const totalInputs = detailPanelEl.querySelectorAll('.rating-input').length;
         if (Object.keys(ratings).length < totalInputs) {
-          alert(`Please provide a rating for all ${totalInputs} algorithms before submitting.`);
+          showToast(`Please provide a rating for all ${totalInputs} algorithms before submitting.`, true);
           return;
         }
 
@@ -1339,7 +1407,7 @@
           if (docSnap.exists()) {
             const data = docSnap.data();
             if (data.samples && data.samples[sample.displayName]) {
-              alert(`You have already submitted ratings for ${sample.displayName}.`);
+              showToast(`You have already submitted ratings for ${sample.displayName}.`, true);
               btn.textContent = originalText;
               btn.disabled = false;
               
@@ -1383,16 +1451,29 @@
           // Move to next sample if not at the end
           const currentIndex = samples.findIndex(s => s.id === state.selected);
           if (currentIndex < samples.length - 1) {
-            setSelected(samples[currentIndex + 1].id);
+            btn.textContent = "Saved!";
+            showToast(`Thank you for giving us your expensive time 🙏 Rating for ${sample.displayName} is saved!`, false);
+            setTimeout(() => {
+              setSelected(samples[currentIndex + 1].id);
+              detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 1000);
+            return;
           } else {
-            alert("Thank you! You have completed all 19 files successfully.");
-            btn.textContent = "Done";
+            detailPanelEl.innerHTML = `
+              <div style="text-align: center; padding: 4rem 2rem;">
+                <div style="font-size: 4rem; margin-bottom: 1rem;">🎉</div>
+                <h2 style="font-family: 'Syne', sans-serif; font-size: 2.5rem; margin-bottom: 1rem; color: var(--sqa);">Evaluation Complete</h2>
+                <p style="font-size: 1.1rem; color: var(--text); opacity: 0.8; margin-bottom: 2rem;">All evaluation is complete. Thank you for your precious time.</p>
+                <p style="font-size: 0.95rem; color: var(--text); opacity: 0.6;">Your feedback has been securely saved to the database. You may now close this page or explore the global statistics.</p>
+              </div>
+            `;
+            detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
             return;
           }
           
         } catch (error) {
           console.error("Error adding document: ", error);
-          alert("Error saving ratings. Please check your console.");
+          showToast("Error saving ratings. Please check your console.", true);
           btn.textContent = originalText;
           btn.disabled = false;
           return;
@@ -1601,7 +1682,10 @@
                   let tableHtml = `
                     <h2 class="detail-title" style="margin-top:2rem;">Files won by <span style="color:${algoColors[algo]}">${algoLabels[algo]}</span></h2>
                     <div class="detail-sub">User: ${selectedCdsid}</div>
-                    <button id="table-back-btn" class="submit-btn" style="margin-top: 1rem; background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem;">&larr; Back to Chart</button>
+                    <div style="display: flex; gap: 1rem; align-items: center; margin-top: 1rem;">
+                      <button id="table-back-btn" class="submit-btn" style="background: var(--panel-2); border: 1px solid var(--border); color: var(--text); padding: 0.5rem 1rem;">&larr; Back to Chart</button>
+                      <button id="table-csv-btn" class="submit-btn" style="background: var(--sqa); color: var(--bg); padding: 0.5rem 1rem;">Download CSV</button>
+                    </div>
                     <div style="overflow-x:auto;">
                     <table style="width:100%; margin-top:1.5rem; border-collapse:collapse; font-size:0.85rem; text-align:left;">
                       <tr style="border-bottom:1px solid var(--border); background:rgba(255,255,255,0.05);">
@@ -1624,6 +1708,22 @@
                   tableHtml += `</table></div>`;
                   detailPanelEl.innerHTML = tableHtml;
                   document.getElementById('table-back-btn').addEventListener('click', renderChart);
+                  
+                  document.getElementById('table-csv-btn').addEventListener('click', () => {
+                    let csvContent = "data:text/csv;charset=utf-8,";
+                    csvContent += "Algo Name,File Name,dB,Score\\n";
+                    files.forEach(f => {
+                      csvContent += `${algoLabels[algo]},${f.displayName},${f.dbVal},${f.maxScore}\\n`;
+                    });
+                    const encodedUri = encodeURI(csvContent);
+                    const link = document.createElement("a");
+                    link.setAttribute("href", encodedUri);
+                    link.setAttribute("download", `${selectedCdsid}_${algoLabels[algo]}_wins.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  });
+
                   detailPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 };
 
