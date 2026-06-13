@@ -837,6 +837,7 @@
         <div class="sidebar-actions" style="display:flex; flex-direction:column; gap:0.5rem;">
           <button id="btn-view-rankings" class="submit-btn" style="width: 100%; font-size: 0.85rem; padding: 0.6rem;">View Rankings</button>
           <button id="btn-global-stats" class="submit-btn" style="width: 100%; font-size: 0.85rem; padding: 0.6rem; background: var(--sqa);">Global Stats</button>
+          <button id="btn-logout" class="submit-btn" style="width: 100%; font-size: 0.85rem; padding: 0.6rem; background: transparent; border: 1px solid var(--danger); color: var(--danger);">Logout / Switch User</button>
         </div>
       </div>
       <section class="detail-panel" id="detail-panel"></section>
@@ -1585,6 +1586,12 @@
       } catch (e) {
         detailPanelEl.innerHTML = `<h2 class="detail-title">Error loading stats</h2><p>${e.message}</p>`;
       }
+    });
+
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      localStorage.removeItem('user_cdsid');
+      state.firebaseRatings = null;
+      location.reload();
     });
 
     document.getElementById('btn-view-rankings').addEventListener('click', async () => {
