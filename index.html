@@ -920,11 +920,11 @@
 
 
     function createPlotsGrid(sample) {
-      const folder = sample.plotFolder;
-      if (!folder) return '';
+      const plotName = sample.fileName.replace('.wav', '.png');
+      if (!plotName) return '';
       let html = '<div class="plots-grid">';
       html += `<figure class="plot-card" style="padding: 0; background: transparent; border: none;">
-        <img src="Metric Plots/${encodeURIComponent(folder)}.png" alt="${folder}" style="width: 100%; max-width: 1200px; border-radius: 8px;" />
+        <img src="Metric Plots/${encodeURIComponent(plotName)}" alt="${plotName}" style="width: 100%; max-width: 1200px; border-radius: 8px;" />
       </figure>`;
       html += '</div>';
       return html;
